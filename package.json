@@ -1,5 +1,5 @@
 {
-  "name": "whisk-image-gen-worker",
+  "name": "whisk-clone-worker",
   "version": "1.0.0",
   "description": "Cloudflare Worker for the Whisk clone image generation pipeline",
   "main": "src/index.js",

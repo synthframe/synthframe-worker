@@ -1,4 +1,4 @@
-# whisk-image-gen-worker
+# whisk-clone-worker
 
 Cloudflare Worker used by the Whisk clone backend for image generation, image analysis, prompt refinement, and img2img flows.
 
