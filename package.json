@@ -1,0 +1,16 @@
+{
+  "name": "whisk-image-gen-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for the Whisk clone image generation pipeline",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "wrangler": "^4.75.0"
+  }
+}
