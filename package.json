@@ -1,7 +1,7 @@
 {
-  "name": "whisk-clone-worker",
+  "name": "synthframe-worker",
   "version": "1.0.0",
-  "description": "Cloudflare Worker for the Whisk clone image generation pipeline",
+  "description": "Cloudflare Worker for the Synthframe image generation pipeline",
   "main": "src/index.js",
   "scripts": {
     "dev": "wrangler dev",
