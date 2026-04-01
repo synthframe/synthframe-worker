@@ -1,13 +1,10 @@
 # synthframe-worker
 
-Cloudflare Worker used by the Synthframe API for image generation, image analysis, prompt refinement, and img2img flows.
+Cloudflare Worker used by the Synthframe API for character-set image generation.
 
 ## Endpoints
 
-- `POST /` - generate an image with `@cf/black-forest-labs/flux-2-dev`
-- `POST /analyze` - analyze an uploaded image into a slot prompt
-- `POST /refine-prompt` - refine subject, scene, and style prompts from user feedback
-- `POST /img2img` - generate a modified image from a reference image and prompt
+- `POST /` - generate an image with `@cf/black-forest-labs/flux-2-dev` using up to 4 reference images
 
 ## Requirements
 

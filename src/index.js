@@ -43,167 +43,11 @@ export default {
       }
     }
 
-    // POST /analyze — vision (LLaVA 1.5)
-    if (request.method === 'POST' && url.pathname === '/analyze') {
-      try {
-        const { image_base64, slot_type } = await request.json()
-        if (!image_base64) {
-          return new Response(JSON.stringify({ error: 'image_base64 is required' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-          })
-        }
-
-        const promptText = slotPrompt(slot_type)
-        const imageBytes = Uint8Array.from(atob(image_base64), (c) => c.charCodeAt(0))
-
-        const response = await env.AI.run('@cf/unum/uform-gen2-qwen-500m', {
-          image: [...imageBytes],
-          prompt: promptText,
-        })
-
-        const prompt = (response.description || '').trim()
-        return new Response(JSON.stringify({ prompt }), {
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-        })
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-        })
-      }
-    }
-
-    // POST /refine-prompt — text LLM prompt refinement (Llama 3.1 8B)
-    if (request.method === 'POST' && url.pathname === '/refine-prompt') {
-      try {
-        const { subject_prompt, scene_prompt, style_prompt, feedback, history = [] } = await request.json()
-        if (!feedback) {
-          return new Response(JSON.stringify({ error: 'feedback is required' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-          })
-        }
-
-        const recentHistory = Array.isArray(history)
-          ? history
-              .filter((item) => item && typeof item.content === 'string' && typeof item.role === 'string')
-              .slice(-6)
-              .map((item) => `${item.role}: ${item.content.trim()}`)
-              .join('\n')
-          : ''
-
-        const systemMsg = `You are an AI image generation prompt refinement assistant.
-Rules:
-1. Output ONLY a valid JSON object with keys "subject_prompt", "scene_prompt", "style_prompt". No markdown, no explanation.
-2. ALL output values MUST be in English only — translate any non-English feedback to English.
-3. Apply the user's feedback precisely. Only change the parts relevant to the feedback. Keep everything else identical to the original.
-4. Preserve identity, pose, composition, clothing, camera angle, and scene continuity unless the user explicitly asks to change them.
-5. When prior conversation exists, treat it as persistent context for the current image edit chain.`
-
-        const userMsg = `Current prompts:
-subject_prompt: "${subject_prompt || ''}"
-scene_prompt: "${scene_prompt || ''}"
-style_prompt: "${style_prompt || ''}"
-
-Recent conversation:
-${recentHistory || '(none)'}
-
-User feedback: ${feedback}
-
-Output JSON only:`
-
-        const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-          messages: [
-            { role: 'system', content: systemMsg },
-            { role: 'user', content: userMsg },
-          ],
-          max_tokens: 300,
-          temperature: 0.4,
-        })
-
-        const content = response.response || ''
-        const start = content.indexOf('{')
-        const end = content.lastIndexOf('}')
-
-        let parsed = {
-          subject_prompt: subject_prompt || '',
-          scene_prompt: scene_prompt || '',
-          style_prompt: style_prompt || '',
-        }
-
-        if (start >= 0 && end > start) {
-          try {
-            const extracted = JSON.parse(content.slice(start, end + 1))
-            if (extracted.subject_prompt) parsed.subject_prompt = extracted.subject_prompt
-            if (extracted.scene_prompt) parsed.scene_prompt = extracted.scene_prompt
-            if (extracted.style_prompt) parsed.style_prompt = extracted.style_prompt
-          } catch {
-            // fallback to originals
-          }
-        }
-
-        return new Response(JSON.stringify(parsed), {
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-        })
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-        })
-      }
-    }
-
-    // POST /img2img — FLUX.2 dev: reference-guided image editing (preserves face/subject)
-    if (request.method === 'POST' && url.pathname === '/img2img') {
-      try {
-        const { image_base64, prompt, reference_images = [], width = 1024, height = 1024 } = await request.json()
-        if (!image_base64 || !prompt) {
-          return new Response(JSON.stringify({ error: 'image_base64 and prompt required' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-          })
-        }
-
-        const response = await runFlux2Dev(env.AI, {
-          prompt,
-          width,
-          height,
-          steps: 25,
-          primaryImage: image_base64,
-          referenceImages: reference_images,
-        })
-
-        const image = decodeImagePayload(response.image)
-        return new Response(image.bytes, {
-          headers: { 'Content-Type': image.mimeType, ...CORS_HEADERS },
-        })
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-        })
-      }
-    }
-
     return new Response(JSON.stringify({ error: 'not found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     })
   },
-}
-
-function slotPrompt(slotType) {
-  switch (slotType) {
-    case 'subject':
-      return 'Describe only the main subject/character. Be concise, comma-separated.'
-    case 'scene':
-      return 'Describe only the setting/background environment. Be concise.'
-    case 'style':
-      return 'Describe only the artistic style, color palette, and lighting. Be concise.'
-    default:
-      return 'Describe the image concisely.'
-  }
 }
 
 function decodeBase64Image(imageBase64) {
@@ -265,17 +109,12 @@ function decodeImagePayload(imageBase64) {
   }
 }
 
-async function runFlux2Dev(ai, { prompt, width, height, steps = 25, primaryImage, referenceImages = [] }) {
+async function runFlux2Dev(ai, { prompt, width, height, steps = 25, referenceImages = [] }) {
   const form = new FormData()
   form.append('prompt', prompt)
   form.append('width', String(width || 1024))
   form.append('height', String(height || 1024))
   form.append('steps', String(steps))
-
-  if (primaryImage) {
-    const image = decodeImagePayload(primaryImage)
-    form.append('input_image_0', new Blob([image.bytes], { type: image.mimeType }), `primary.${image.extension}`)
-  }
 
   referenceImages
     .filter((image) => typeof image === 'string' && image.trim())
@@ -283,7 +122,7 @@ async function runFlux2Dev(ai, { prompt, width, height, steps = 25, primaryImage
     .forEach((image, index) => {
       const decoded = decodeImagePayload(image)
       form.append(
-        `input_image_${index + 1}`,
+        `input_image_${index}`,
         new Blob([decoded.bytes], { type: decoded.mimeType }),
         `reference-${index + 1}.${decoded.extension}`
       )
